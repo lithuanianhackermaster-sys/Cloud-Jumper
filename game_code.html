@@ -1,0 +1,2312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cloud Jumper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           CSS RESET & BASE STYLES
+           ============================================ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden;
+            font-family: 'Fredoka', 'Chewy', 'Comic Sans MS', cursive, sans-serif;
+            touch-action: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* ============================================
+           CSS CUSTOM PROPERTIES
+           ============================================ */
+        :root {
+            /* Animation Timings */
+            --transition-fast: 150ms;
+            --transition-normal: 300ms;
+            --transition-slow: 500ms;
+            
+            /* Easing Functions */
+            --ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+            --ease-bounce: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+            
+            /* Spacing Scale (8px grid) */
+            --space-xs: 8px;
+            --space-sm: 16px;
+            --space-md: 24px;
+            --space-lg: 32px;
+            --space-xl: 48px;
+            
+            /* Color System */
+            --color-primary: #9370DB;
+            --color-primary-hover: #7B5CB8;
+            --color-accent: #FFD700;
+            --color-accent-hover: #FFC700;
+            --color-glass: rgba(255, 255, 255, 0.15);
+            --color-glass-border: rgba(255, 255, 255, 0.3);
+            --color-text-primary: #FFFFFF;
+            --color-text-secondary: rgba(255, 255, 255, 0.8);
+            
+            /* Shadows & Effects */
+            --shadow-sm: 0 2px 8px rgba(106, 13, 173, 0.15);
+            --shadow-md: 0 4px 16px rgba(106, 13, 173, 0.2);
+            --shadow-lg: 0 8px 32px rgba(106, 13, 173, 0.25);
+            --glow-primary: 0 0 20px rgba(147, 112, 219, 0.5);
+            --glow-accent: 0 0 20px rgba(255, 215, 0, 0.5);
+            --glow-strong: 0 0 30px rgba(147, 112, 219, 0.7);
+            
+            /* Glass Effect */
+            --glass-blur: blur(20px);
+        }
+        
+        /* ============================================
+           GAME CANVAS
+           ============================================ */
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #87CEEB 0%, #FFB6C1 100%);
+        }
+        
+        /* ============================================
+           GLASS PANEL COMPONENT (Reusable)
+           ============================================ */
+        .glass-panel {
+            background: var(--color-glass);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 2px solid var(--color-glass-border);
+            border-radius: var(--space-md);
+            box-shadow: var(--shadow-md);
+        }
+        
+        /* ============================================
+           UI OVERLAY (Score & Instructions)
+           ============================================ */
+        .ui-overlay {
+            position: absolute;
+            top: var(--space-sm);
+            left: var(--space-sm);
+            right: var(--space-sm);
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        #scoreDisplay {
+            display: inline-block;
+            padding: 12px var(--space-md);
+            background: var(--color-glass);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 2px solid var(--color-glass-border);
+            border-radius: 100px;
+            color: var(--color-text-primary);
+            font-size: 28px;
+            font-weight: 600;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: var(--shadow-md), var(--glow-primary);
+            transition: transform var(--transition-fast) var(--ease-out);
+        }
+        
+        #scoreDisplay.pulse {
+            animation: scorePulse 400ms var(--ease-bounce);
+        }
+        
+        #instructionText {
+            display: inline-block;
+            margin-top: var(--space-sm);
+            padding: var(--space-sm) var(--space-md);
+            background: var(--color-glass);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 2px solid var(--color-glass-border);
+            border-radius: 100px;
+            color: var(--color-text-secondary);
+            font-size: 20px;
+            font-weight: 500;
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+            box-shadow: var(--shadow-sm);
+            opacity: 1;
+            transition: opacity var(--transition-slow) var(--ease-out);
+        }
+        
+        #instructionText.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* ============================================
+           TOUCH CONTROLS
+           ============================================ */
+        .controls {
+            position: absolute;
+            bottom: var(--space-md);
+            left: 0;
+            right: 0;
+            display: none;
+            pointer-events: none;
+            z-index: 20;
+        }
+        
+        .controls.visible {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 var(--space-md);
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .control-btn {
+            width: 96px;
+            height: 96px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.1) 100%);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 3px solid var(--color-glass-border);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: var(--color-text-primary);
+            user-select: none;
+            pointer-events: auto;
+            box-shadow: var(--shadow-lg), var(--glow-primary);
+            cursor: pointer;
+            transition: all var(--transition-fast) var(--ease-out);
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .control-btn:active {
+            transform: scale(0.92);
+            box-shadow: var(--shadow-md), var(--glow-strong);
+            background: linear-gradient(135deg, rgba(147, 112, 219, 0.3) 0%, rgba(147, 112, 219, 0.15) 100%);
+        }
+        
+        @media (hover: hover) {
+            .control-btn:hover {
+                transform: scale(1.05);
+                box-shadow: var(--shadow-lg), var(--glow-strong);
+            }
+        }
+        
+        /* ============================================
+           VICTORY SCREEN
+           ============================================ */
+        .victory-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(106, 13, 173, 0.95) 0%, rgba(147, 112, 219, 0.95) 100%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-text-primary);
+            text-align: center;
+            padding: var(--space-md);
+            z-index: 100;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all var(--transition-slow) var(--ease-out);
+        }
+        
+        .victory-screen.visible {
+            display: flex;
+            animation: victoryEntrance 600ms var(--ease-bounce) forwards;
+        }
+        
+        .victory-content {
+            background: var(--color-glass);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 3px solid var(--color-glass-border);
+            border-radius: var(--space-lg);
+            padding: var(--space-xl);
+            box-shadow: var(--shadow-lg), var(--glow-strong);
+            max-width: 600px;
+        }
+        
+        .victory-title {
+            font-size: 64px;
+            font-weight: 700;
+            margin-bottom: var(--space-md);
+            text-shadow: 3px 3px 12px rgba(0, 0, 0, 0.4);
+            animation: victoryTitleFloat 3s ease-in-out infinite;
+        }
+        
+        .victory-message {
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: var(--space-sm);
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .victory-stars {
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--color-accent);
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3), var(--glow-accent);
+            margin-top: var(--space-sm);
+        }
+        
+        .play-again-btn {
+            margin-top: var(--space-lg);
+            padding: 16px 32px;
+            background: linear-gradient(135deg, var(--color-accent) 0%, #FFC700 100%);
+            border: none;
+            border-radius: 100px;
+            color: #333;
+            font-size: 24px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg), var(--glow-accent);
+            transition: all var(--transition-fast) var(--ease-out);
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+            pointer-events: auto;
+        }
+        
+        .play-again-btn:hover {
+            transform: scale(1.08);
+            box-shadow: var(--shadow-lg), 0 0 30px rgba(255, 215, 0, 0.8);
+        }
+        
+        .play-again-btn:active {
+            transform: scale(0.96);
+        }
+        
+        /* ============================================
+           EDIT MODE PALETTE
+           ============================================ */
+        .edit-palette {
+            position: absolute;
+            top: var(--space-md);
+            right: var(--space-md);
+            background: var(--color-glass);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 2px solid var(--color-glass-border);
+            border-radius: var(--space-md);
+            padding: var(--space-sm);
+            display: none;
+            flex-direction: column;
+            gap: var(--space-xs);
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            z-index: 50;
+            min-width: 180px;
+        }
+        
+        .edit-palette.visible {
+            display: flex;
+        }
+        
+        .palette-header {
+            font-weight: 600;
+            font-size: 18px;
+            color: var(--color-text-primary);
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+            margin-bottom: var(--space-xs);
+            padding-bottom: var(--space-xs);
+            border-bottom: 2px solid var(--color-glass-border);
+        }
+        
+        .palette-item {
+            padding: 12px var(--space-sm);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 100%);
+            border: 2px solid var(--color-glass-border);
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--color-text-primary);
+            text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+            transition: all var(--transition-fast) var(--ease-out);
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .palette-item:hover {
+            background: linear-gradient(135deg, rgba(147, 112, 219, 0.3) 0%, rgba(147, 112, 219, 0.2) 100%);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .palette-item:active {
+            transform: translateY(0);
+        }
+        
+        /* ============================================
+           ANIMATIONS
+           ============================================ */
+        @keyframes scorePulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.15);
+            }
+        }
+        
+        @keyframes victoryEntrance {
+            0% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        @keyframes victoryTitleFloat {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        @keyframes sparkle {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(0);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        /* ============================================
+           REDUCED MOTION SUPPORT
+           ============================================ */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            
+            .victory-title {
+                animation: none;
+            }
+        }
+        
+        /* ============================================
+           SCROLLBAR STYLING (Edit Palette)
+           ============================================ */
+        .edit-palette::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .edit-palette::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        .edit-palette::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+        
+        .edit-palette::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="controls" id="touchControls">
+        <div class="control-group">
+            <div class="control-btn" id="leftBtn">←</div>
+            <div class="control-btn" id="rightBtn">→</div>
+        </div>
+        <div class="control-btn" id="jumpBtn">↑</div>
+    </div>
+    
+    <div class="ui-overlay" id="uiOverlay">
+        <div id="scoreDisplay">⭐ 0</div>
+        <div id="instructionText"></div>
+        <div id="powerIndicator" style="display: none; margin-top: 8px; padding: 8px 16px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(20px); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 100px; color: white; font-size: 16px; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3); box-shadow: 0 4px 16px rgba(147, 112, 219, 0.2);"></div>
+    </div>
+    
+    <div class="victory-screen" id="victoryScreen">
+        <div class="victory-content">
+            <div class="victory-title" id="victoryTitle">🌟 Victory! 🌟</div>
+            <div class="victory-message" id="victoryMessage">You reached the Sky Wizard!</div>
+            <div class="victory-stars" id="finalScore"></div>
+            <button id="playAgainBtn" class="play-again-btn">Play Again</button>
+        </div>
+    </div>
+    
+    <div class="edit-palette" id="editPalette">
+        <div class="palette-header">✨ Add Objects</div>
+        <div class="palette-item" data-type="cloud_small">☁️ Small Cloud</div>
+        <div class="palette-item" data-type="cloud_medium">☁️ Medium Cloud</div>
+        <div class="palette-item" data-type="cloud_large">☁️ Large Cloud</div>
+        <div class="palette-item" data-type="blue_cloud">🔵 Blue Cloud</div>
+        <div class="palette-item" data-type="red_cloud">🔴 Red Cloud</div>
+        <div class="palette-item" data-type="power_cloud">⚡ Power Cloud</div>
+        <div class="palette-item" data-type="flight_cloud">💚 Flight Cloud</div>
+        <div class="palette-item" data-type="mushroom">🍄 Bouncy Mushroom</div>
+        <div class="palette-item" data-type="mushroom_island">🏝️ Mushroom Island</div>
+        <div class="palette-item" data-type="invisible_platform">👻 Invisible</div>
+        <div class="palette-item" data-type="elevator">🪀 Trampoline</div>
+        <div class="palette-item" data-type="star">⭐ Star Crystal</div>
+    </div>
+
+    <script>
+        /* ==================================================
+         * GAME OVERVIEW: Cloud Jumper - A whimsical 2D vertical platformer where players
+         * control a cute messenger character climbing through a magical sky world to reach
+         * a sky wizard. Features bouncy mushroom platforms, collectible star crystals,
+         * and smooth physics-based movement.
+         * 
+         * EDIT MODE: Players can place, move, and configure platforms, mushrooms, and stars.
+         * Click objects to select and edit properties. Drag to reposition. Use palette to add new objects.
+         * 
+         * GAME STATE SHAPE: window.gameConfig = {
+         *   gravity: number,
+         *   jumpForce: number,
+         *   moveSpeed: number,
+         *   bouncePower: number,
+         *   playerStart: { x: number, y: number },
+         *   wizardPosition: { x: number, y: number },
+         *   platforms: [{ id: string, type: 'cloud_small'|'cloud_medium'|'cloud_large'|'mushroom', 
+         *                 x: number, y: number, width: number, height: number }],
+         *   stars: [{ id: string, x: number, y: number, collected: false }]
+         * }
+         * ==================================================
+         */
+
+        // Game constants
+        const CANVAS_WIDTH = 720;
+        const CANVAS_HEIGHT = 1280;
+        const PLAYER_WIDTH = 80;
+        const PLAYER_HEIGHT = 80;
+        
+        // Global state
+        let canvas, ctx;
+        let currentMode = 'play';
+        let assetCache = {};
+        let audioContext;
+        let audioBuffers = {};
+        let backgroundMusicSource = null;
+        
+        // Runtime game state (NOT in gameConfig)
+        let player = {
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            width: PLAYER_WIDTH,
+            height: PLAYER_HEIGHT,
+            grounded: false,
+            facingRight: true,
+            jumping: false,
+            doubleJumpAvailable: true
+        };
+        
+        let camera = {
+            x: 0,
+            y: 0,
+            targetY: 0,
+            targetX: 0
+        };
+        
+        let input = {
+            left: false,
+            right: false,
+            jump: false,
+            jumpPressed: false
+        };
+        
+        let gameState = {
+            playing: false,
+            won: false,
+            collectedStars: 0,
+            totalStars: 0,
+            respawning: false,
+            playerMoved: false,
+            activePowers: {
+                speedBoost: { active: false, duration: 0, multiplier: 1.5 },
+                jumpBoost: { active: false, duration: 0, multiplier: 1.4 },
+                bounceBoost: { active: false, duration: 0, multiplier: 1.8 },
+                flight: { active: false, duration: 0 }
+            },
+            windStrength: 0,
+            windDirection: 1
+        };
+        
+        let editState = {
+            selectedObject: null,
+            dragging: false,
+            dragOffset: { x: 0, y: 0 }
+        };
+        
+        let lastTime = 0;
+        let animationFrame = null;
+        
+        // Device detection
+        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        
+        // UI Enhancement: Instruction fade timer
+        let instructionFadeTimer = null;
+        
+        // Asset preloading
+        function preloadAssets(assetIds, callback) {
+            let loadedCount = 0;
+            const totalAssets = assetIds.length;
+            
+            assetIds.forEach(id => {
+                const assetInfo = lib.getAsset(id);
+                if (!assetInfo) {
+                    lib.log('Asset not found: ' + id);
+                    loadedCount++;
+                    if (loadedCount === totalAssets) callback();
+                    return;
+                }
+                
+                if (assetInfo.type === 'audio') {
+                    fetch(assetInfo.url)
+                        .then(response => response.arrayBuffer())
+                        .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+                        .then(audioBuffer => {
+                            audioBuffers[id] = audioBuffer;
+                            loadedCount++;
+                            if (loadedCount === totalAssets) callback();
+                        })
+                        .catch(err => {
+                            lib.log('Error loading audio ' + id + ': ' + err);
+                            loadedCount++;
+                            if (loadedCount === totalAssets) callback();
+                        });
+                } else {
+                    const img = new Image();
+                    img.onload = () => {
+                        assetCache[id] = { img, info: assetInfo };
+                        loadedCount++;
+                        if (loadedCount === totalAssets) callback();
+                    };
+                    img.onerror = () => {
+                        lib.log('Error loading image: ' + id);
+                        loadedCount++;
+                        if (loadedCount === totalAssets) callback();
+                    };
+                    img.src = assetInfo.url;
+                }
+            });
+        }
+        
+        // Audio playback
+        function playSound(soundId, loop = false) {
+            if (!audioBuffers[soundId]) return null;
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffers[soundId];
+            source.loop = loop;
+            source.connect(audioContext.destination);
+            source.start(0);
+            return source;
+        }
+        
+        function stopSound(source) {
+            if (source) {
+                try {
+                    source.stop();
+                } catch (e) {
+                    // Already stopped
+                }
+            }
+        }
+        
+        // UI Enhancement: Score pulse animation
+        function pulseScore() {
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            scoreDisplay.classList.remove('pulse');
+            // Force reflow
+            void scoreDisplay.offsetWidth;
+            scoreDisplay.classList.add('pulse');
+        }
+        
+        // UI Enhancement: Hide instruction text
+        function hideInstructions() {
+            const instructionText = document.getElementById('instructionText');
+            instructionText.classList.add('hidden');
+        }
+        
+        // UI Enhancement: Start instruction fade timer
+        function startInstructionFadeTimer() {
+            if (instructionFadeTimer) {
+                clearTimeout(instructionFadeTimer);
+            }
+            instructionFadeTimer = setTimeout(() => {
+                hideInstructions();
+            }, 3000);
+        }
+        
+        // Initialize game config with default level
+        function initializeGameConfig() {
+            if (!window.gameConfig) {
+                window.gameConfig = {};
+            }
+            
+            // Set defaults if not present
+            if (window.gameConfig.gravity === undefined) window.gameConfig.gravity = 1200;
+            if (window.gameConfig.jumpForce === undefined) window.gameConfig.jumpForce = 700;
+            if (window.gameConfig.moveSpeed === undefined) window.gameConfig.moveSpeed = 300;
+            if (window.gameConfig.bouncePower === undefined) window.gameConfig.bouncePower = 1000;
+            
+            if (!window.gameConfig.playerStart) {
+                window.gameConfig.playerStart = { x: 100, y: 640 };
+            }
+            
+            if (!window.gameConfig.platforms) {
+                window.gameConfig.platforms = [];
+            }
+            
+            if (!window.gameConfig.stars) {
+                window.gameConfig.stars = [];
+            }
+        }
+        
+        // Procedural level generation
+        let proceduralState = {
+            nextPlatformX: 200,
+            difficulty: 0,
+            distanceTraveled: 0,
+            platformIdCounter: 0,
+            starIdCounter: 0
+        };
+        
+        function initializeProceduralLevel() {
+            proceduralState.nextPlatformX = 200;
+            proceduralState.difficulty = 0;
+            proceduralState.distanceTraveled = 0;
+            proceduralState.platformIdCounter = 0;
+            proceduralState.starIdCounter = 0;
+            window.gameConfig.platforms = [];
+            window.gameConfig.stars = [];
+            
+            // Create starting island platform at player spawn location
+            const startingPlatform = {
+                id: 'p_start',
+                type: 'cloud_large',
+                x: window.gameConfig.playerStart.x - 200,
+                y: window.gameConfig.playerStart.y + 40,
+                width: 400,
+                height: 50
+            };
+            window.gameConfig.platforms.push(startingPlatform);
+            proceduralState.nextPlatformX = startingPlatform.x + 500;
+            
+            // Generate initial platforms - enough for smooth gameplay without overcrowding
+            for (let i = 0; i < 12; i++) {
+                generateNextPlatform();
+            }
+        }
+        
+        function generateNextPlatform() {
+    const difficulty = Math.min(proceduralState.difficulty, 10);
+    const difficultyFactor = difficulty / 10;
+    
+    // Get the last platform to calculate reachability
+    let lastPlatform = null;
+    if (window.gameConfig.platforms.length > 0) {
+        lastPlatform = window.gameConfig.platforms[window.gameConfig.platforms.length - 1];
+    }
+    
+    // Calculate jump physics constraints with conservative estimates
+    const maxJumpHeight = (window.gameConfig.jumpForce * window.gameConfig.jumpForce) / (2 * window.gameConfig.gravity);
+    const maxDoubleJumpHeight = maxJumpHeight * 1.8; // Double jump gives extra height
+    const maxHorizontalDistance = (window.gameConfig.moveSpeed * window.gameConfig.jumpForce) / window.gameConfig.gravity;
+    
+    // Maximum reachable vertical distance with safety margin
+    const maxVerticalReach = maxDoubleJumpHeight + 300; // Extra buffer for falling + safety margin
+    
+    // Platform spacing - conservative to ensure reachability
+    const baseSpacing = 350;
+    const maxSpacing = 450 + difficultyFactor * 100;
+    const spacing = baseSpacing + (maxSpacing - baseSpacing) * difficultyFactor;
+    const randomSpacing = spacing + Math.random() * 80;
+    
+    proceduralState.nextPlatformX += randomSpacing;
+    
+    // Platform type selection - more clouds, fewer special platforms
+    let type;
+    const mushroomIslandChance = 0.06 + difficultyFactor * 0.08;
+    const blueCloudChance = 0.12 + difficultyFactor * 0.08;
+    const redCloudChance = 0.03 + difficultyFactor * 0.04;
+    const powerCloudChance = 0.12 + difficultyFactor * 0.15;
+    const flightCloudChance = 0.02 + difficultyFactor * 0.02;
+    const invisibleChance = 0.10 + difficultyFactor * 0.12;
+    const elevatorChance = 0.02 + difficultyFactor * 0.02;
+    
+    const rand = Math.random();
+    if (rand < mushroomIslandChance) {
+        type = 'mushroom_island';
+    } else if (rand < mushroomIslandChance + blueCloudChance) {
+        type = 'blue_cloud';
+    } else if (rand < mushroomIslandChance + blueCloudChance + redCloudChance) {
+        type = 'red_cloud';
+    } else if (rand < mushroomIslandChance + blueCloudChance + redCloudChance + powerCloudChance) {
+        type = 'power_cloud';
+    } else if (rand < mushroomIslandChance + blueCloudChance + redCloudChance + powerCloudChance + flightCloudChance) {
+        type = 'flight_cloud';
+    } else if (rand < mushroomIslandChance + blueCloudChance + redCloudChance + powerCloudChance + flightCloudChance + invisibleChance) {
+        type = 'invisible_platform';
+    } else if (rand < mushroomIslandChance + blueCloudChance + redCloudChance + powerCloudChance + flightCloudChance + invisibleChance + elevatorChance) {
+        type = 'elevator';
+    } else {
+        const cloudRand = Math.random();
+        if (cloudRand < 0.20) type = 'cloud_small';
+        else if (cloudRand < 0.60) type = 'cloud_medium';
+        else type = 'cloud_large';
+    }
+    
+    // Platform size - starts large, gets smaller with difficulty
+    let width, height;
+    if (type === 'cloud_small') {
+        width = Math.max(80, 140 - difficultyFactor * 50);
+        height = 40;
+    } else if (type === 'cloud_medium') {
+        width = Math.max(120, 240 - difficultyFactor * 80);
+        height = 45;
+    } else if (type === 'cloud_large') {
+        width = Math.max(180, 350 - difficultyFactor * 120);
+        height = 50;
+    } else if (type === 'blue_cloud') {
+        width = Math.max(100, 200 - difficultyFactor * 60);
+        height = 45;
+    } else if (type === 'red_cloud') {
+        width = Math.max(100, 200 - difficultyFactor * 60);
+        height = 45;
+    } else if (type === 'power_cloud') {
+        width = 140;
+        height = 50;
+    } else if (type === 'flight_cloud') {
+        width = 160;
+        height = 55;
+    } else if (type === 'invisible_platform') {
+        width = Math.max(100, 160 - difficultyFactor * 40);
+        height = 40;
+    } else if (type === 'elevator') {
+        width = 120;
+        height = 50;
+    } else if (type === 'mushroom_island') {
+        width = 200;
+        height = 50;
+    }
+    
+    // Vertical position - ENSURE REACHABILITY with strict validation
+    // IMPORTANT: Platforms should generally go DOWN, not up
+    let y;
+    if (lastPlatform) {
+        // Calculate reachable vertical range from last platform
+        const minReachableY = lastPlatform.y - maxVerticalReach; // Can jump up to this height
+        const maxReachableY = lastPlatform.y + maxVerticalReach; // Can fall down to this height
+        
+        // Bias toward downward progression - prefer platforms below
+        // Only allow slight upward movement (max 150 pixels up)
+        const maxUpwardMovement = 150;
+        const minY = Math.max(60, lastPlatform.y - maxUpwardMovement);
+        const maxY = Math.min(1100, maxReachableY);
+        
+        // If range is invalid, force a reachable position
+        if (minY >= maxY) {
+            // Platform is unreachable - place it at a safe distance below
+            y = lastPlatform.y + 250;
+        } else {
+            // Place within reachable range with strong bias toward downward
+            const rangeSize = maxY - minY;
+            if (rangeSize < 100) {
+                // Very tight range - place in middle
+                y = (minY + maxY) / 2;
+            } else {
+                // Bias toward lower platforms (downward progression)
+                const randomFactor = Math.random();
+                // Use squared random to bias toward higher y values (lower on screen)
+                const biasedFactor = randomFactor * randomFactor;
+                y = minY + biasedFactor * rangeSize;
+            }
+        }
+    } else {
+        const baseY = 640;
+        const maxVerticalVariation = 250 + difficultyFactor * 150;
+        y = baseY + (Math.random() - 0.5) * maxVerticalVariation;
+    }
+    
+    y = Math.max(60, Math.min(1100, y));
+    
+    const platform = {
+        id: 'p' + (proceduralState.platformIdCounter++),
+        type: type,
+        x: proceduralState.nextPlatformX,
+        y: y,
+        width: width,
+        height: height
+    };
+    
+    // Add power type for power clouds
+    if (type === 'power_cloud') {
+        const powerTypes = ['speed', 'jump', 'bounce'];
+        platform.powerType = powerTypes[Math.floor(Math.random() * powerTypes.length)];
+    }
+    
+    window.gameConfig.platforms.push(platform);
+    
+    // If this is a red cloud, spawn flight clouds before and after, plus trampolines
+    if (type === 'red_cloud') {
+        // Flight cloud BEFORE the red cloud
+        const flightCloudBefore = {
+            id: 'p' + (proceduralState.platformIdCounter++),
+            type: 'flight_cloud',
+            x: proceduralState.nextPlatformX - 300,
+            y: y - 150,
+            width: 160,
+            height: 55
+        };
+        window.gameConfig.platforms.push(flightCloudBefore);
+        
+        // Flight cloud AFTER the red cloud
+        const flightCloudAfter = {
+            id: 'p' + (proceduralState.platformIdCounter++),
+            type: 'flight_cloud',
+            x: proceduralState.nextPlatformX + width + 150,
+            y: y - 150,
+            width: 160,
+            height: 55
+        };
+        window.gameConfig.platforms.push(flightCloudAfter);
+        
+        // Trampoline after the second flight cloud to launch to next island
+        const trampoline = {
+            id: 'p' + (proceduralState.platformIdCounter++),
+            type: 'elevator',
+            x: proceduralState.nextPlatformX + width + 450,
+            y: y - 100,
+            width: 120,
+            height: 50
+        };
+        window.gameConfig.platforms.push(trampoline);
+    }
+    
+    // Add mushroom on top of island
+    if (type === 'mushroom_island') {
+        const mushroom = {
+            id: 'p' + (proceduralState.platformIdCounter++),
+            type: 'mushroom',
+            x: proceduralState.nextPlatformX + width / 2 - 45,
+            y: y - 75,
+            width: 90,
+            height: 75
+        };
+        window.gameConfig.platforms.push(mushroom);
+    }
+    
+    // Occasionally add stars
+    if (Math.random() < 0.35) {
+        const star = {
+            id: 's' + (proceduralState.starIdCounter++),
+            x: proceduralState.nextPlatformX + width / 2,
+            y: platform.y - 60,
+            collected: false
+        };
+        window.gameConfig.stars.push(star);
+    }
+}
+        
+        function activatePower(powerType, duration = 4) {
+            gameState.activePowers[powerType].active = true;
+            gameState.activePowers[powerType].duration = duration;
+            playSound('collect_star_sound');
+        }
+        
+        function updatePowers(dt) {
+            Object.keys(gameState.activePowers).forEach(key => {
+                if (gameState.activePowers[key].active) {
+                    gameState.activePowers[key].duration -= dt;
+                    if (gameState.activePowers[key].duration <= 0) {
+                        gameState.activePowers[key].active = false;
+                        gameState.activePowers[key].duration = 0;
+                    }
+                }
+            });
+        }
+        
+        function updateDifficulty() {
+            const distance = player.x;
+            proceduralState.distanceTraveled = distance;
+            proceduralState.difficulty = Math.floor(distance / 1000);
+        }
+        
+        function getBackgroundStyle() {
+            const difficulty = Math.min(proceduralState.difficulty, 10);
+            
+            if (difficulty < 2) {
+                // Early game: light pastels
+                return {
+                    gradient1: '#87CEEB',
+                    gradient2: '#FFB6C1',
+                    cloudColor: 'rgba(255, 255, 255, 0.8)'
+                };
+            } else if (difficulty < 4) {
+                // Mid game: deeper colors
+                return {
+                    gradient1: '#6BA3D4',
+                    gradient2: '#FF9AC9',
+                    cloudColor: 'rgba(255, 240, 245, 0.7)'
+                };
+            } else if (difficulty < 6) {
+                // Later: more vibrant
+                return {
+                    gradient1: '#4A90E2',
+                    gradient2: '#FF6B9D',
+                    cloudColor: 'rgba(255, 200, 220, 0.6)'
+                };
+            } else if (difficulty < 8) {
+                // Advanced: darker tones
+                return {
+                    gradient1: '#2E5C8A',
+                    gradient2: '#E63384',
+                    cloudColor: 'rgba(200, 150, 200, 0.5)'
+                };
+            } else {
+                // Extreme: dark and intense
+                return {
+                    gradient1: '#1A3A52',
+                    gradient2: '#8B0043',
+                    cloudColor: 'rgba(150, 100, 150, 0.4)'
+                };
+            }
+        }
+        
+        // Reset player to start position
+        function resetPlayer() {
+    player.x = window.gameConfig.playerStart.x;
+    player.y = window.gameConfig.playerStart.y;
+    player.vx = 0;
+    player.vy = 0;
+    player.grounded = false;
+    player.jumping = false;
+    player.doubleJumpAvailable = true;
+    camera.x = 0;
+    camera.targetX = 0;
+    camera.y = 0;
+    camera.targetY = 0;
+}
+        
+        // Physics and collision
+        function updatePhysics(dt) {
+    // Limit delta time to prevent large jumps
+    dt = Math.min(dt, 0.11);
+    
+    // Update active powers
+    updatePowers(dt);
+    
+    // Update wind effect - oscillates to push player up and down
+    gameState.windStrength += dt * 2;
+    const windForce = Math.sin(gameState.windStrength) * 400; // Oscillating wind force
+    
+    // Apply gravity (reduced if flying)
+    let gravityMultiplier = gameState.activePowers.flight.active ? 0.3 : 1;
+    player.vy += window.gameConfig.gravity * dt * gravityMultiplier;
+    
+    // Apply wind force (upward push)
+    player.vy += windForce * dt;
+    
+    // CLAMP VELOCITY to prevent tunneling through platforms
+    const maxVerticalVelocity = 2000; // Maximum downward speed
+    const maxHorizontalVelocity = 800; // Maximum horizontal speed
+    player.vy = Math.max(-maxVerticalVelocity, Math.min(maxVerticalVelocity, player.vy));
+    
+    // Apply horizontal movement - always moving right, can adjust speed
+    let moveInput = 0;
+    if (input.left) {
+        moveInput = -1;
+        player.facingRight = false;
+    } else if (input.right) {
+        moveInput = 1;
+        player.facingRight = true;
+    }
+    
+    // Apply horizontal movement based on input with speed boost
+    let speedMultiplier = gameState.activePowers.speedBoost.active ? gameState.activePowers.speedBoost.multiplier : 1;
+    player.vx = moveInput * window.gameConfig.moveSpeed * speedMultiplier;
+    player.vx = Math.max(-maxHorizontalVelocity, Math.min(maxHorizontalVelocity, player.vx));
+    
+    // UI Enhancement: Hide instructions on first move
+    if ((input.left || input.right || input.jump) && !gameState.playerMoved) {
+        gameState.playerMoved = true;
+        hideInstructions();
+    }
+    
+    // Store previous position for swept collision detection
+    const prevX = player.x;
+    const prevY = player.y;
+    
+    // Update position
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+    
+    // Check if fell off bottom - game over
+    if (player.y > CANVAS_HEIGHT + 200) {
+        if (!gameState.won) {
+            gameState.won = true;
+            gameState.playing = false;
+            stopSound(backgroundMusicSource);
+            playSound('victory_sound');
+            showGameOverScreen();
+        }
+    }
+    
+    // Check platform collisions with swept detection
+    player.grounded = false;
+    let bouncedThisFrame = false;
+    
+    window.gameConfig.platforms.forEach(platform => {
+        // Get player bounds
+        const px = player.x - player.width / 2;
+        const py = player.y - player.height / 2;
+        const pw = player.width;
+        const ph = player.height;
+        
+        // Get previous player bounds for swept collision
+        const prevPx = prevX - player.width / 2;
+        const prevPy = prevY - player.height / 2;
+        
+        // Check if player is currently overlapping platform
+        const isOverlapping = px < platform.x + platform.width &&
+                             px + pw > platform.x &&
+                             py < platform.y + platform.height &&
+                             py + ph > platform.y;
+        
+        // Check if player was above platform before and is now overlapping (falling onto it)
+        const wasPrevAbove = prevPy + ph <= platform.y + 5; // Small buffer for precision
+        const isFallingOnto = isOverlapping && wasPrevAbove && player.vy > 0;
+        
+        if (isOverlapping) {
+            // Check if it's a deadly red cloud - instant game over
+            if (platform.type === 'red_cloud') {
+                if (!gameState.won) {
+                    gameState.won = true;
+                    gameState.playing = false;
+                    stopSound(backgroundMusicSource);
+                    playSound('victory_sound');
+                    showGameOverScreen();
+                }
+                return;
+            }
+            
+            // Check if player is falling onto platform from above
+            if (isFallingOnto) {
+                player.y = platform.y - player.height / 2;
+                player.vy = 0;
+                player.grounded = true;
+                player.jumping = false;
+                player.doubleJumpAvailable = true; // Reset double jump on ground
+                
+                // Check if it's a bouncy mushroom
+                if (platform.type === 'mushroom' && !bouncedThisFrame) {
+                    let bounceMultiplier = gameState.activePowers.bounceBoost.active ? gameState.activePowers.bounceBoost.multiplier : 1;
+                    player.vy = -window.gameConfig.bouncePower * bounceMultiplier;
+                    player.doubleJumpAvailable = true; // Reset double jump after bounce
+                    playSound('bounce_sound');
+                    bouncedThisFrame = true;
+                }
+                
+                // Check if it's a power cloud
+                if (platform.type === 'power_cloud' && !bouncedThisFrame) {
+                    // Determine which power to activate based on platform properties
+                    if (platform.powerType === 'speed') {
+                        activatePower('speedBoost', 5);
+                    } else if (platform.powerType === 'jump') {
+                        activatePower('jumpBoost', 5);
+                    } else if (platform.powerType === 'bounce') {
+                        activatePower('bounceBoost', 5);
+                    }
+                    player.vy = -window.gameConfig.bouncePower * 1.2;
+                    player.doubleJumpAvailable = true;
+                    playSound('bounce_sound');
+                    bouncedThisFrame = true;
+                }
+                
+                // Check if it's a flight cloud
+                if (platform.type === 'flight_cloud' && !bouncedThisFrame) {
+                    gameState.activePowers.flight.active = true;
+                    gameState.activePowers.flight.duration = 10;
+                    player.vy = -window.gameConfig.bouncePower * 0.8;
+                    player.doubleJumpAvailable = true;
+                    playSound('bounce_sound');
+                    bouncedThisFrame = true;
+                }
+                
+                // Check if it's a trampoline/elevator
+                if (platform.type === 'elevator' && !bouncedThisFrame) {
+                    // Trampoline launches player high to reach next island
+                    player.vy = -window.gameConfig.bouncePower * 1.5; // Strong launch
+                    player.doubleJumpAvailable = true;
+                    playSound('bounce_sound');
+                    bouncedThisFrame = true;
+                }
+            }
+        }
+    });
+    
+    // Jump logic - now with double jump and jump boost
+    if (input.jump && !input.jumpPressed) {
+        let jumpMultiplier = gameState.activePowers.jumpBoost.active ? gameState.activePowers.jumpBoost.multiplier : 1;
+        let jumpForce = window.gameConfig.jumpForce * jumpMultiplier;
+        
+        if (player.grounded) {
+            // First jump from ground
+            player.vy = -jumpForce;
+            player.grounded = false;
+            player.jumping = true;
+            player.doubleJumpAvailable = true;
+            input.jumpPressed = true;
+            playSound('jump_sound');
+        } else if (player.doubleJumpAvailable) {
+            // Double jump in air
+            player.vy = -jumpForce;
+            player.doubleJumpAvailable = false;
+            input.jumpPressed = true;
+            playSound('jump_sound');
+        }
+    }
+    
+    if (!input.jump) {
+        input.jumpPressed = false;
+    }
+    
+    // Check star collection with solid collision
+    window.gameConfig.stars.forEach(star => {
+        if (!star.collected) {
+            const starSize = 40; // Star collision box size
+            const px = player.x - player.width / 2;
+            const py = player.y - player.height / 2;
+            const pw = player.width;
+            const ph = player.height;
+            
+            // AABB collision detection for stars
+            if (px < star.x + starSize / 2 &&
+                px + pw > star.x - starSize / 2 &&
+                py < star.y + starSize / 2 &&
+                py + ph > star.y - starSize / 2) {
+                
+                star.collected = true;
+                gameState.collectedStars++;
+                playSound('collect_star_sound');
+                pulseScore();
+            }
+        }
+    });
+    
+    // Update difficulty based on distance
+    updateDifficulty();
+    
+    // Generate new platforms as needed - generate further ahead for smoother gameplay
+    while (proceduralState.nextPlatformX < player.x + CANVAS_WIDTH * 2) {
+        generateNextPlatform();
+    }
+    
+    // Remove platforms that are far behind to save memory (but keep starting platform and more buffer)
+    window.gameConfig.platforms = window.gameConfig.platforms.filter(p => p.id === 'p_start' || p.x > player.x - 800);
+    window.gameConfig.stars = window.gameConfig.stars.filter(s => s.x > player.x - 800);
+    
+    // Update camera - follow player horizontally (keep player in right third of screen)
+    camera.targetX = player.x - CANVAS_WIDTH / 3;
+    camera.targetX = Math.max(0, camera.targetX);
+    camera.x += (camera.targetX - camera.x) * 0.2;
+    
+    // Vertical camera follows player - keep them centered vertically
+    camera.targetY = player.y - CANVAS_HEIGHT / 2;
+    camera.targetY = Math.max(0, camera.targetY);
+    camera.y += (camera.targetY - camera.y) * 0.15;
+}
+        
+        // Rendering
+        function drawImageWithAspect(imageId, x, y, width, height) {
+            const asset = assetCache[imageId];
+            if (!asset) return;
+            
+            const img = asset.img;
+            const aspectRatio = asset.info.aspect_ratio;
+            
+            if (aspectRatio) {
+                const imgAspect = aspectRatio[0] / aspectRatio[1];
+                const targetAspect = width / height;
+                
+                let drawWidth = width;
+                let drawHeight = height;
+                let offsetX = 0;
+                let offsetY = 0;
+                
+                if (imgAspect > targetAspect) {
+                    // Image is wider - fit height
+                    drawHeight = height;
+                    drawWidth = height * imgAspect;
+                    offsetX = (width - drawWidth) / 2;
+                } else {
+                    // Image is taller - fit width
+                    drawWidth = width;
+                    drawHeight = width / imgAspect;
+                    offsetY = (height - drawHeight) / 2;
+                }
+                
+                ctx.drawImage(img, x + offsetX, y + offsetY, drawWidth, drawHeight);
+            } else {
+                ctx.drawImage(img, x, y, width, height);
+            }
+        }
+        
+        function render() {
+    // Get dynamic background style based on difficulty
+    const bgStyle = getBackgroundStyle();
+    
+    // Clear canvas with gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    gradient.addColorStop(0, bgStyle.gradient1);
+    gradient.addColorStop(1, bgStyle.gradient2);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    // Draw wind effect when active
+    if (Math.abs(gameState.windStrength % (Math.PI * 2)) < Math.PI) {
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = '#87CEEB';
+        for (let i = 0; i < 5; i++) {
+            const waveY = (camera.y + i * 200 + gameState.windStrength * 100) % CANVAS_HEIGHT;
+            ctx.fillRect(0, waveY, CANVAS_WIDTH, 30);
+        }
+        ctx.restore();
+    }
+    
+    // Save context for camera transform
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+    
+    // Draw background clouds (parallax)
+    if (assetCache['background_clouds']) {
+        const parallaxX = camera.x * 0.3;
+        const parallaxY = camera.y * 0.3;
+        for (let i = 0; i < 5; i++) {
+            for (let j = 0; j < 3; j++) {
+                drawImageWithAspect('background_clouds', 
+                    parallaxX + i * 400 - 100, 
+                    parallaxY + j * 400 + 100, 
+                    250, 
+                    150);
+            }
+        }
+    }
+    
+    // Draw platforms
+    window.gameConfig.platforms.forEach(platform => {
+        let assetId;
+        if (platform.type === 'cloud_small') assetId = 'marshmallow_cloud_small';
+        else if (platform.type === 'cloud_medium') assetId = 'marshmallow_cloud_medium';
+        else if (platform.type === 'cloud_large') assetId = 'marshmallow_cloud_large';
+        else if (platform.type === 'mushroom') assetId = 'bouncy_mushroom';
+        else if (platform.type === 'mushroom_island') assetId = 'marshmallow_cloud_medium';
+        
+        if (platform.type === 'invisible_platform') {
+            // Invisible platforms - blink in play mode, visible in edit mode
+            const blinkCycle = (Date.now() / 500) % 2; // Blink every 500ms
+            const isVisible = blinkCycle < 1; // Visible for first 500ms of cycle
+            
+            if (currentMode === 'edit' || isVisible) {
+                ctx.fillStyle = 'rgba(150, 200, 255, 0.4)';
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                ctx.strokeStyle = 'rgba(100, 150, 255, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+                
+                if (currentMode === 'edit') {
+                    ctx.fillStyle = 'rgba(100, 150, 255, 0.9)';
+                    ctx.font = '12px Arial';
+                    ctx.fillText('INVISIBLE', platform.x + 5, platform.y + 20);
+                }
+            }
+        } else if (platform.type === 'blue_cloud') {
+            // Blue cloud platforms - safe cloud-like shape with bumps
+            ctx.fillStyle = '#87CEEB';
+            ctx.strokeStyle = '#4DB8FF';
+            ctx.lineWidth = 2;
+            
+            // Draw cloud shape with rounded bumps
+            const x = platform.x;
+            const y = platform.y;
+            const w = platform.width;
+            const h = platform.height;
+            const r = h / 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Add cloud bumps on top for visual interest
+            ctx.fillStyle = '#B0E0E6';
+            for (let i = 0; i < 3; i++) {
+                const bumpX = x + (w / 4) + (i * w / 3);
+                const bumpY = y - h / 3;
+                const bumpR = h / 3;
+                ctx.beginPath();
+                ctx.arc(bumpX, bumpY, bumpR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Add safe symbol
+            ctx.fillStyle = '#4DB8FF';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('✓', x + w / 2, y + h / 2 + 6);
+        } else if (platform.type === 'red_cloud') {
+            // Red cloud platforms - cloud-like shape with bumps (DEADLY)
+            ctx.fillStyle = '#FF4444';
+            ctx.strokeStyle = '#CC0000';
+            ctx.lineWidth = 2;
+            
+            // Draw cloud shape with rounded bumps
+            const x = platform.x;
+            const y = platform.y;
+            const w = platform.width;
+            const h = platform.height;
+            const r = h / 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Add cloud bumps on top for visual interest
+            ctx.fillStyle = '#FF6666';
+            for (let i = 0; i < 3; i++) {
+                const bumpX = x + (w / 4) + (i * w / 3);
+                const bumpY = y - h / 3;
+                const bumpR = h / 3;
+                ctx.beginPath();
+                ctx.arc(bumpX, bumpY, bumpR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Add danger symbol
+            ctx.fillStyle = '#FFFF00';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('☠', x + w / 2, y + h / 2 + 6);
+        } else if (platform.type === 'power_cloud') {
+            // Power cloud platforms - spinning with glow effect
+            const x = platform.x;
+            const y = platform.y;
+            const w = platform.width;
+            const h = platform.height;
+            
+            // Determine color based on power type
+            let color, glowColor;
+            if (platform.powerType === 'speed') {
+                color = '#FF6B6B';
+                glowColor = 'rgba(255, 107, 107, 0.6)';
+            } else if (platform.powerType === 'jump') {
+                color = '#4ECDC4';
+                glowColor = 'rgba(78, 205, 196, 0.6)';
+            } else {
+                color = '#FFE66D';
+                glowColor = 'rgba(255, 230, 109, 0.6)';
+            }
+            
+            // Draw spinning effect
+            ctx.save();
+            ctx.translate(x + w / 2, y + h / 2);
+            const rotation = (Date.now() / 20) % (Math.PI * 2);
+            ctx.rotate(rotation);
+            
+            // Draw star/power shape
+            ctx.fillStyle = color;
+            ctx.strokeStyle = glowColor;
+            ctx.lineWidth = 3;
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 15;
+            
+            // Draw star shape
+            const points = 6;
+            const outerRadius = w / 2;
+            const innerRadius = w / 4;
+            ctx.beginPath();
+            for (let i = 0; i < points * 2; i++) {
+                const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                const angle = (i * Math.PI) / points;
+                const px = Math.cos(angle) * radius;
+                const py = Math.sin(angle) * radius;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.restore();
+            
+            // Draw label
+            ctx.fillStyle = color;
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(platform.powerType.toUpperCase(), x + w / 2, y + h + 15);
+        } else if (platform.type === 'flight_cloud') {
+            // Flight cloud platforms - green with wings and glow
+            const x = platform.x;
+            const y = platform.y;
+            const w = platform.width;
+            const h = platform.height;
+            
+            // Draw cloud shape with rounded bumps
+            ctx.fillStyle = '#00FF00';
+            ctx.strokeStyle = '#00CC00';
+            ctx.lineWidth = 2;
+            
+            const r = h / 2;
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Add cloud bumps on top
+            ctx.fillStyle = '#33FF33';
+            for (let i = 0; i < 3; i++) {
+                const bumpX = x + (w / 4) + (i * w / 3);
+                const bumpY = y - h / 3;
+                const bumpR = h / 3;
+                ctx.beginPath();
+                ctx.arc(bumpX, bumpY, bumpR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Add glow effect
+            ctx.shadowColor = 'rgba(0, 255, 0, 0.8)';
+            ctx.shadowBlur = 20;
+            
+            // Draw wings animation
+            ctx.save();
+            ctx.translate(x + w / 2, y + h / 2);
+            const wingFlap = Math.sin(Date.now() / 200) * 0.3;
+            ctx.rotate(wingFlap);
+            
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.6)';
+            ctx.beginPath();
+            ctx.ellipse(-w / 3, 0, w / 4, h / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(w / 3, 0, w / 4, h / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // Draw label
+            ctx.fillStyle = '#00CC00';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('FLY', x + w / 2, y + h + 15);
+        } else if (platform.type === 'elevator') {
+            // Elevator platforms - metallic with moving indicator
+            const x = platform.x;
+            const y = platform.y;
+            const w = platform.width;
+            const h = platform.height;
+            
+            // Draw metallic elevator platform
+            ctx.fillStyle = '#C0C0C0';
+            ctx.strokeStyle = '#808080';
+            ctx.lineWidth = 2;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeRect(x, y, w, h);
+            
+            // Draw elevator cable on left side
+            ctx.strokeStyle = '#666666';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x + 10, y - 20);
+            ctx.lineTo(x + 10, y + h + 20);
+            ctx.stroke();
+            
+            // Draw elevator cable on right side
+            ctx.beginPath();
+            ctx.moveTo(x + w - 10, y - 20);
+            ctx.lineTo(x + w - 10, y + h + 20);
+            ctx.stroke();
+            
+            // Draw moving up indicator
+            const bobAmount = Math.sin(Date.now() / 300) * 5;
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('↑', x + w / 2, y + h / 2 + bobAmount);
+            
+            // Draw label
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('BOUNCE', x + w / 2, y + h + 15);
+        } else if (assetId && assetCache[assetId]) {
+            drawImageWithAspect(assetId, platform.x, platform.y, platform.width, platform.height);
+        } else {
+            // Fallback rendering if asset not available
+            ctx.fillStyle = platform.type === 'mushroom' ? '#FF69B4' : '#FFE4B5';
+            ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+        }
+        
+        // Draw selection outline in edit mode
+        if (currentMode === 'edit' && editState.selectedObject === platform) {
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+        }
+    });
+    
+    // Draw stars
+    window.gameConfig.stars.forEach(star => {
+        if (!star.collected) {
+            if (assetCache['star_crystal']) {
+                drawImageWithAspect('star_crystal', star.x - 20, star.y - 20, 40, 40);
+            } else {
+                // Fallback star rendering
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Draw selection outline in edit mode
+            if (currentMode === 'edit' && editState.selectedObject === star) {
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(star.x - 20, star.y - 20, 40, 40);
+            }
+        }
+    });
+    
+    // Draw player - ALWAYS visible with fallback
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    if (!player.facingRight) {
+        ctx.scale(-1, 1);
+    }
+    
+    const playerAsset = player.jumping || !player.grounded ? 'player_character_jumping' : 'player_character';
+    if (assetCache[playerAsset]) {
+        drawImageWithAspect(playerAsset, -player.width / 2, -player.height / 2, player.width, player.height);
+    } else {
+        // Fallback player rendering - visible character
+        ctx.fillStyle = '#4169E1';
+        ctx.fillRect(-player.width / 2, -player.height / 2, player.width, player.height);
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(-player.width / 6, -player.height / 4, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(player.width / 6, -player.height / 4, 8, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    ctx.restore();
+    ctx.restore(); // Restore camera transform
+    
+    // Update UI - show distance instead of stars
+    const distance = Math.floor(player.x / 100);
+    document.getElementById('scoreDisplay').textContent = 
+        '📍 ' + distance + ' | ⭐ ' + gameState.collectedStars;
+    
+    // Update power indicator
+    const powerIndicator = document.getElementById('powerIndicator');
+    const activePowers = [];
+    if (gameState.activePowers.speedBoost.active) {
+        activePowers.push('🔴 SPEED (' + Math.ceil(gameState.activePowers.speedBoost.duration) + 's)');
+    }
+    if (gameState.activePowers.jumpBoost.active) {
+        activePowers.push('🔵 JUMP (' + Math.ceil(gameState.activePowers.jumpBoost.duration) + 's)');
+    }
+    if (gameState.activePowers.bounceBoost.active) {
+        activePowers.push('🟡 BOUNCE (' + Math.ceil(gameState.activePowers.bounceBoost.duration) + 's)');
+    }
+    if (gameState.activePowers.flight.active) {
+        activePowers.push('💚 FLY (' + Math.ceil(gameState.activePowers.flight.duration) + 's)');
+    }
+    
+    if (activePowers.length > 0) {
+        powerIndicator.textContent = activePowers.join(' | ');
+        powerIndicator.style.display = 'inline-block';
+    } else {
+        powerIndicator.style.display = 'none';
+    }
+}
+        
+        // Game loop
+        function gameLoop(timestamp) {
+            const dt = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.11) : 0;
+            lastTime = timestamp;
+            
+            if (currentMode === 'play' && gameState.playing && !gameState.won) {
+                updatePhysics(dt);
+            }
+            
+            render();
+            
+            animationFrame = requestAnimationFrame(gameLoop);
+        }
+        
+        // Victory screen (triggered by falling off)
+        function showGameOverScreen() {
+            const victoryScreen = document.getElementById('victoryScreen');
+            const victoryTitle = document.querySelector('.victory-title');
+            const victoryMessage = document.getElementById('victoryMessage');
+            const finalScore = document.getElementById('finalScore');
+            
+            victoryTitle.textContent = '💫 Game Over! 💫';
+            victoryMessage.textContent = 'You did great!';
+            const distance = Math.floor(player.x / 100);
+            finalScore.textContent = '📍 Distance: ' + distance + ' | ⭐ Stars: ' + gameState.collectedStars;
+            victoryScreen.classList.add('visible');
+        }
+        
+        // Play again handler
+        function setupPlayAgainButton() {
+            const playAgainBtn = document.getElementById('playAgainBtn');
+            if (playAgainBtn) {
+                playAgainBtn.addEventListener('click', () => {
+                    // Reset game state
+                    resetPlayer();
+                    gameState.playing = true;
+                    gameState.won = false;
+                    gameState.collectedStars = 0;
+                    gameState.playerMoved = false;
+                    gameState.totalStars = 0;
+                    
+                    // Initialize procedural level
+                    initializeProceduralLevel();
+                    
+                    // Hide victory screen
+                    document.getElementById('victoryScreen').classList.remove('visible');
+                    
+                    // Start background music
+                    backgroundMusicSource = playSound('background_music', true);
+                    
+                    // Show instructions
+                    const instructionText = document.getElementById('instructionText');
+                    instructionText.textContent = '🎮 Run right and jump! How far can you go?';
+                    instructionText.classList.remove('hidden');
+                    
+                    // Start instruction fade timer
+                    startInstructionFadeTimer();
+                });
+            }
+        }
+        
+        // Input handling
+        function setupInputHandlers() {
+            // Keyboard
+            window.addEventListener('keydown', (e) => {
+                if (currentMode !== 'play') return;
+                
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                    input.left = true;
+                    e.preventDefault();
+                }
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                    input.right = true;
+                    e.preventDefault();
+                }
+                if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                    input.jump = true;
+                    e.preventDefault();
+                }
+            });
+            
+            window.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                    input.left = false;
+                }
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                    input.right = false;
+                }
+                if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+                    input.jump = false;
+                }
+            });
+            
+            // Touch controls
+            const leftBtn = document.getElementById('leftBtn');
+            const rightBtn = document.getElementById('rightBtn');
+            const jumpBtn = document.getElementById('jumpBtn');
+            
+            function addTouchHandler(element, onStart, onEnd) {
+                element.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    onStart();
+                });
+                element.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    onEnd();
+                });
+                element.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    onStart();
+                });
+                element.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    onEnd();
+                });
+            }
+            
+            addTouchHandler(leftBtn, () => { input.left = true; }, () => { input.left = false; });
+            addTouchHandler(rightBtn, () => { input.right = true; }, () => { input.right = false; });
+            addTouchHandler(jumpBtn, () => { input.jump = true; }, () => { input.jump = false; });
+        }
+        
+        // Edit mode handlers
+        function setupEditHandlers() {
+            canvas.addEventListener('mousedown', handleEditMouseDown);
+            canvas.addEventListener('mousemove', handleEditMouseMove);
+            canvas.addEventListener('mouseup', handleEditMouseUp);
+            canvas.addEventListener('touchstart', handleEditTouchStart);
+            canvas.addEventListener('touchmove', handleEditTouchMove);
+            canvas.addEventListener('touchend', handleEditTouchEnd);
+            
+            // Palette handlers
+            const paletteItems = document.querySelectorAll('.palette-item');
+            paletteItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const type = item.getAttribute('data-type');
+                    addNewObject(type);
+                });
+            });
+        }
+        
+        function getCanvasCoordinates(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = CANVAS_WIDTH / rect.width;
+            const scaleY = CANVAS_HEIGHT / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY + camera.y
+            };
+        }
+        
+        function handleEditMouseDown(e) {
+            if (currentMode !== 'edit') return;
+            
+            const coords = getCanvasCoordinates(e.clientX, e.clientY);
+            selectObjectAt(coords.x, coords.y);
+            
+            if (editState.selectedObject) {
+                editState.dragging = true;
+                if (editState.selectedObject.x !== undefined) {
+                    editState.dragOffset.x = coords.x - editState.selectedObject.x;
+                    editState.dragOffset.y = coords.y - editState.selectedObject.y;
+                }
+            }
+        }
+        
+        function handleEditMouseMove(e) {
+            if (currentMode !== 'edit' || !editState.dragging || !editState.selectedObject) return;
+            
+            const coords = getCanvasCoordinates(e.clientX, e.clientY);
+            
+            if (editState.selectedObject.x !== undefined) {
+                editState.selectedObject.x = coords.x - editState.dragOffset.x;
+                editState.selectedObject.y = coords.y - editState.dragOffset.y;
+            }
+        }
+        
+        function handleEditMouseUp(e) {
+            editState.dragging = false;
+        }
+        
+        function handleEditTouchStart(e) {
+            if (currentMode !== 'edit' || e.touches.length === 0) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const coords = getCanvasCoordinates(touch.clientX, touch.clientY);
+            selectObjectAt(coords.x, coords.y);
+            
+            if (editState.selectedObject) {
+                editState.dragging = true;
+                if (editState.selectedObject.x !== undefined) {
+                    editState.dragOffset.x = coords.x - editState.selectedObject.x;
+                    editState.dragOffset.y = coords.y - editState.selectedObject.y;
+                }
+            }
+        }
+        
+        function handleEditTouchMove(e) {
+            if (currentMode !== 'edit' || !editState.dragging || !editState.selectedObject || e.touches.length === 0) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const coords = getCanvasCoordinates(touch.clientX, touch.clientY);
+            
+            if (editState.selectedObject.x !== undefined) {
+                editState.selectedObject.x = coords.x - editState.dragOffset.x;
+                editState.selectedObject.y = coords.y - editState.dragOffset.y;
+            }
+        }
+        
+        function handleEditTouchEnd(e) {
+            editState.dragging = false;
+        }
+        
+        function selectObjectAt(x, y) {
+            // Check platforms
+            for (let i = window.gameConfig.platforms.length - 1; i >= 0; i--) {
+                const platform = window.gameConfig.platforms[i];
+                if (x >= platform.x && x <= platform.x + platform.width &&
+                    y >= platform.y && y <= platform.y + platform.height) {
+                    editState.selectedObject = platform;
+                    showEditMenu(platform, 'platform');
+                    return;
+                }
+            }
+            
+            // Check stars
+            for (let i = window.gameConfig.stars.length - 1; i >= 0; i--) {
+                const star = window.gameConfig.stars[i];
+                if (x >= star.x - 20 && x <= star.x + 20 &&
+                    y >= star.y - 20 && y <= star.y + 20) {
+                    editState.selectedObject = star;
+                    showEditMenu(star, 'star');
+                    return;
+                }
+            }
+            
+            // No object selected
+            editState.selectedObject = null;
+            lib.editMenu.close();
+        }
+        
+        function showEditMenu(obj, objType) {
+            if (objType === 'platform') {
+                const params = {
+                    'X Position': {
+                        key: 'x',
+                        type: 'number',
+                        onChange: (value) => {
+                            obj.x = parseFloat(value);
+                        }
+                    },
+                    'Y Position': {
+                        key: 'y',
+                        type: 'number',
+                        onChange: (value) => {
+                            obj.y = parseFloat(value);
+                        }
+                    },
+                    'Type': {
+                        key: 'type',
+                        type: 'dropdown',
+                        options: [
+                            { label: 'Small Cloud', value: 'cloud_small' },
+                            { label: 'Medium Cloud', value: 'cloud_medium' },
+                            { label: 'Large Cloud', value: 'cloud_large' },
+                            { label: 'Blue Cloud', value: 'blue_cloud' },
+                            { label: 'Red Cloud', value: 'red_cloud' },
+                            { label: 'Power Cloud', value: 'power_cloud' },
+                            { label: 'Flight Cloud', value: 'flight_cloud' },
+                            { label: 'Bouncy Mushroom', value: 'mushroom' },
+                            { label: 'Mushroom Island', value: 'mushroom_island' },
+                            { label: 'Invisible Platform', value: 'invisible_platform' },
+                            { label: 'Elevator', value: 'elevator' }
+                        ],
+                        onChange: (value) => {
+                            obj.type = value;
+                            // Update dimensions based on type
+                            if (value === 'cloud_small') {
+                                obj.width = 150;
+                                obj.height = 40;
+                            } else if (value === 'cloud_medium') {
+                                obj.width = 250;
+                                obj.height = 45;
+                            } else if (value === 'cloud_large') {
+                                obj.width = 400;
+                                obj.height = 50;
+                            } else if (value === 'blue_cloud') {
+                                obj.width = 200;
+                                obj.height = 45;
+                            } else if (value === 'red_cloud') {
+                                obj.width = 200;
+                                obj.height = 45;
+                            } else if (value === 'power_cloud') {
+                                obj.width = 140;
+                                obj.height = 50;
+                                if (!obj.powerType) obj.powerType = 'speed';
+                            } else if (value === 'flight_cloud') {
+                                obj.width = 160;
+                                obj.height = 55;
+                            } else if (value === 'mushroom') {
+                                obj.width = 100;
+                                obj.height = 80;
+                            } else if (value === 'mushroom_island') {
+                                obj.width = 200;
+                                obj.height = 50;
+                            } else if (value === 'invisible_platform') {
+                                obj.width = 150;
+                                obj.height = 40;
+                            } else if (value === 'elevator') {
+                                obj.width = 120;
+                                obj.height = 50;
+                            }
+                        }
+                    }
+                };
+                
+                // Add power type selector for power clouds
+                if (obj.type === 'power_cloud') {
+                    params['Power Type'] = {
+                        key: 'powerType',
+                        type: 'dropdown',
+                        options: [
+                            { label: 'Speed Boost', value: 'speed' },
+                            { label: 'Jump Boost', value: 'jump' },
+                            { label: 'Bounce Boost', value: 'bounce' }
+                        ],
+                        onChange: (value) => {
+                            obj.powerType = value;
+                        }
+                    };
+                }
+                
+                lib.editMenu.open({
+                    name: 'Platform',
+                    params: params,
+                    onCopy: () => {
+                        const newPlatform = {
+                            id: 'p' + Date.now(),
+                            type: obj.type,
+                            x: obj.x + 50,
+                            y: obj.y + 50,
+                            width: obj.width,
+                            height: obj.height
+                        };
+                        window.gameConfig.platforms.push(newPlatform);
+                        editState.selectedObject = newPlatform;
+                        showEditMenu(newPlatform, 'platform');
+                    },
+                    onDelete: () => {
+                        const index = window.gameConfig.platforms.indexOf(obj);
+                        if (index > -1) {
+                            window.gameConfig.platforms.splice(index, 1);
+                        }
+                        editState.selectedObject = null;
+                        lib.editMenu.close();
+                    }
+                });
+            } else if (objType === 'star') {
+                lib.editMenu.open({
+                    name: 'Star Crystal',
+                    params: {
+                        'X Position': {
+                            key: 'x',
+                            type: 'number',
+                            onChange: (value) => {
+                                obj.x = parseFloat(value);
+                            }
+                        },
+                        'Y Position': {
+                            key: 'y',
+                            type: 'number',
+                            onChange: (value) => {
+                                obj.y = parseFloat(value);
+                            }
+                        }
+                    },
+                    onCopy: () => {
+                        const newStar = {
+                            id: 's' + Date.now(),
+                            x: obj.x + 50,
+                            y: obj.y + 50,
+                            collected: false
+                        };
+                        window.gameConfig.stars.push(newStar);
+                        editState.selectedObject = newStar;
+                        showEditMenu(newStar, 'star');
+                    },
+                    onDelete: () => {
+                        const index = window.gameConfig.stars.indexOf(obj);
+                        if (index > -1) {
+                            window.gameConfig.stars.splice(index, 1);
+                        }
+                        editState.selectedObject = null;
+                        lib.editMenu.close();
+                    }
+                });
+            }
+        }
+        
+        function addNewObject(type) {
+            const centerY = camera.y + CANVAS_HEIGHT / 2;
+            
+            if (type === 'star') {
+                const newStar = {
+                    id: 's' + Date.now(),
+                    x: CANVAS_WIDTH / 2,
+                    y: centerY,
+                    collected: false
+                };
+                window.gameConfig.stars.push(newStar);
+                editState.selectedObject = newStar;
+                showEditMenu(newStar, 'star');
+            } else {
+                let width, height;
+                if (type === 'cloud_small') {
+                    width = 150;
+                    height = 40;
+                } else if (type === 'cloud_medium') {
+                    width = 250;
+                    height = 45;
+                } else if (type === 'cloud_large') {
+                    width = 400;
+                    height = 50;
+                } else if (type === 'blue_cloud') {
+                    width = 200;
+                    height = 45;
+                } else if (type === 'red_cloud') {
+                    width = 200;
+                    height = 45;
+                } else if (type === 'power_cloud') {
+                    width = 140;
+                    height = 50;
+                } else if (type === 'flight_cloud') {
+                    width = 160;
+                    height = 55;
+                } else if (type === 'mushroom') {
+                    width = 100;
+                    height = 80;
+                } else if (type === 'mushroom_island') {
+                    width = 200;
+                    height = 50;
+                } else if (type === 'invisible_platform') {
+                    width = 150;
+                    height = 40;
+                } else if (type === 'elevator') {
+                    width = 120;
+                    height = 50;
+                }
+                
+                const newPlatform = {
+                    id: 'p' + Date.now(),
+                    type: type,
+                    x: CANVAS_WIDTH / 2 - width / 2,
+                    y: centerY,
+                    width: width,
+                    height: height
+                };
+                
+                // Add power type for power clouds
+                if (type === 'power_cloud') {
+                    newPlatform.powerType = 'speed';
+                }
+                
+                window.gameConfig.platforms.push(newPlatform);
+                editState.selectedObject = newPlatform;
+                showEditMenu(newPlatform, 'platform');
+            }
+        }
+        
+        // Main run function
+                function run(mode) {
+            lib.log('run() called. Mode: ' + mode);
+            currentMode = mode;
+            
+            // Initialize canvas
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
+            
+            // Initialize audio context
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Initialize game config
+            initializeGameConfig();
+            
+            // Show game parameters
+            lib.showGameParameters({
+                name: 'Game Settings',
+                params: {
+                    'Gravity': {
+                        key: 'gameConfig.gravity',
+                        type: 'slider',
+                        min: 600,
+                        max: 2000,
+                        step: 50,
+                        onChange: (value) => {
+                            window.gameConfig.gravity = value;
+                        }
+                    },
+                    'Jump Force': {
+                        key: 'gameConfig.jumpForce',
+                        type: 'slider',
+                        min: 300,
+                        max: 800,
+                        step: 25,
+                        onChange: (value) => {
+                            window.gameConfig.jumpForce = value;
+                        }
+                    },
+                    'Move Speed': {
+                        key: 'gameConfig.moveSpeed',
+                        type: 'slider',
+                        min: 150,
+                        max: 500,
+                        step: 25,
+                        onChange: (value) => {
+                            window.gameConfig.moveSpeed = value;
+                        }
+                    },
+                    'Bounce Power': {
+                        key: 'gameConfig.bouncePower',
+                        type: 'slider',
+                        min: 600,
+                        max: 1500,
+                        step: 50,
+                        onChange: (value) => {
+                            window.gameConfig.bouncePower = value;
+                        }
+                    }
+                }
+            });
+            
+            // Preload assets
+            const assetIds = [
+                'player_character',
+                'player_character_jumping',
+                'marshmallow_cloud_large',
+                'marshmallow_cloud_medium',
+                'marshmallow_cloud_small',
+                'bouncy_mushroom',
+                'star_crystal',
+                'sky_wizard',
+                'background_clouds',
+                'jump_sound',
+                'bounce_sound',
+                'collect_star_sound',
+                'victory_sound',
+                'background_music'
+            ];
+            
+            preloadAssets(assetIds, () => {
+                lib.log('All assets loaded');
+                
+                // Setup input handlers
+                setupInputHandlers();
+                setupEditHandlers();
+                setupPlayAgainButton();
+                
+                if (mode === 'play') {
+                    // Play mode setup
+                    document.getElementById('victoryScreen').classList.remove('visible');
+                    document.getElementById('editPalette').classList.remove('visible');
+                    
+                    // Show touch controls on mobile
+                    if (isTouchDevice) {
+                        document.getElementById('touchControls').classList.add('visible');
+                    }
+                    
+                    // Reset game state
+                    resetPlayer();
+                    gameState.playing = true;
+                    gameState.won = false;
+                    gameState.collectedStars = 0;
+                    gameState.playerMoved = false;
+                    gameState.totalStars = 0;
+                    
+                    // Initialize procedural level
+                    initializeProceduralLevel();
+                    
+                    // Start background music
+                    backgroundMusicSource = playSound('background_music', true);
+                    
+                    // Show instructions
+                    const instructionText = document.getElementById('instructionText');
+                    instructionText.textContent = '🎮 Run right and jump! How far can you go?';
+                    instructionText.classList.remove('hidden');
+                    
+                    // Start instruction fade timer
+                    startInstructionFadeTimer();
+                    
+                } else if (mode === 'edit') {
+                    // Edit mode setup
+                    document.getElementById('touchControls').classList.remove('visible');
+                    document.getElementById('victoryScreen').classList.remove('visible');
+                    document.getElementById('editPalette').classList.add('visible');
+                    
+                    gameState.playing = false;
+                    stopSound(backgroundMusicSource);
+                    
+                    // Position player at start for reference
+                    resetPlayer();
+                    
+                    const instructionText = document.getElementById('instructionText');
+                    instructionText.textContent = '✏️ Edit Mode: Click objects to select and drag';
+                    instructionText.classList.remove('hidden');
+                }
+                
+                // Start game loop
+                if (animationFrame) {
+                    cancelAnimationFrame(animationFrame);
+                }
+                lastTime = 0;
+                gameLoop(0);
+            });
+        }
+    </script>
+</body>
+</html>
